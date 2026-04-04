@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT Tool</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <pre class="banner">
+  ___  ____ ___ _   _ _____   _____ ___   ___  _
+ / _ \/ ___|_ _| \ | |_   _| |_   _/ _ \ / _ \| |
+| | | \___ \| ||  \| | | |     | || | | | | | | |
+| |_| |___) | || |\  | | |     | || |_| | |_| | |___
+ \___/|____/___|_| \_| |_|     |_| \___/ \___/|_____|
+      </pre>
+    </header>
+
+    <form id="search-form">
+      <div class="search-row">
+        <input
+          id="query-input"
+          type="text"
+          placeholder="Enter email or username..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="submit">Search</button>
+      </div>
+      <div class="search-options-row">
+        <button type="button" id="cap-btn" class="cap-btn active">
+          &#9889; 100 Hop Cap
+        </button>
+        <span class="cap-hint">Stops multi-hop discovery at 100 seeds to prevent runaway searches</span>
+      </div>
+    </form>
+
+    <div id="status" class="status hidden"></div>
+    <div id="results" class="hidden"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

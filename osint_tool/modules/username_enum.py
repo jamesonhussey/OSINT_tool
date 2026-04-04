@@ -41,8 +41,20 @@ async def _check_by_body(
 
 
 async def _check_github(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # GitHub returns 404 for non-existent users
-    return await _check_by_status(session, f"https://github.com/{username}")
+    # Use the REST API — more reliable than scraping the profile page (CDN/WAF
+    # often returns non-200 for automated requests on the web URL).
+    url = f"https://api.github.com/users/{username}"
+    async with session.get(
+        url,
+        headers={**HEADERS, "Accept": "application/vnd.github+json"},
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as resp:
+        if resp.status == 200:
+            return AccountStatus.FOUND
+        elif resp.status == 404:
+            return AccountStatus.NOT_FOUND
+        else:
+            return AccountStatus.ERROR
 
 
 async def _check_instagram(session: aiohttp.ClientSession, username: str) -> AccountStatus:
