@@ -56,10 +56,22 @@ hybridsBtn.addEventListener('click', async () => {
     setGlobalStatus('No searches on screen to generate hybrids from.', 3000);
     return;
   }
-  const seeds = blocks.map(b => ({
-    value: b.dataset.query,
-    type: b.dataset.query.includes('@') ? 'email' : 'username',
-  }));
+
+  const seeds = [];
+  const seen  = new Set();
+  const addSeed = value => {
+    const key = value.trim().toLowerCase();
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      seeds.push({ value: value.trim(), type: value.includes('@') ? 'email' : 'username' });
+    }
+  };
+
+  // Explicitly searched queries
+  blocks.forEach(b => addSeed(b.dataset.query));
+
+  // Discovered identities from every visible Unique Identities panel
+  document.querySelectorAll('.uid-list .unique-id-value').forEach(el => addSeed(el.textContent));
 
   hybridTray.classList.remove('hidden');
   hybridTray.innerHTML = `<div class="variant-tray-loading">Analysing ${seeds.length} search${seeds.length !== 1 ? 'es' : ''}…</div>`;
