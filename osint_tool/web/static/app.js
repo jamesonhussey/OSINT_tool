@@ -18,11 +18,20 @@ let currentHopEl = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const form     = document.getElementById('search-form');
-const input    = document.getElementById('query-input');
-const statusEl = document.getElementById('status');
-const resultsEl = document.getElementById('results');
-const capBtn   = document.getElementById('cap-btn');
+const form        = document.getElementById('search-form');
+const input       = document.getElementById('query-input');
+const statusEl    = document.getElementById('status');
+const resultsEl   = document.getElementById('results');
+const capBtn      = document.getElementById('cap-btn');
+const variantsBtn = document.getElementById('variants-btn');
+const variantTray = document.getElementById('variant-tray');
+const settingsBtn  = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsClose = document.getElementById('settings-close');
+const settingsSave  = document.getElementById('settings-save');
+const apiKeyInput   = document.getElementById('api-key-input');
+const apiKeyStatus  = document.getElementById('api-key-status');
+const autoVariantsToggle = document.getElementById('auto-variants-toggle');
 
 // ── Cap toggle ────────────────────────────────────────────────────────────────
 
@@ -31,12 +40,142 @@ capBtn.addEventListener('click', () => {
   capBtn.classList.toggle('active', capEnabled);
 });
 
+// ── Settings modal ────────────────────────────────────────────────────────────
+
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', () => settingsModal.classList.add('hidden'));
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) settingsModal.classList.add('hidden');
+});
+
+settingsSave.addEventListener('click', async () => {
+  settingsSave.disabled = true;
+  settingsSave.textContent = 'Saving…';
+  const body = { auto_search_variants: autoVariantsToggle.checked };
+  const keyVal = apiKeyInput.value.trim();
+  if (keyVal) body.anthropic_api_key = keyVal;
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  settingsSave.disabled = false;
+  settingsSave.textContent = 'Saved!';
+  setTimeout(() => {
+    settingsSave.textContent = 'Save';
+    settingsModal.classList.add('hidden');
+    loadSettings();
+  }, 800);
+});
+
+async function openSettings() {
+  settingsModal.classList.remove('hidden');
+  await loadSettings();
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    autoVariantsToggle.checked = data.auto_search_variants;
+    if (data.has_api_key) {
+      apiKeyInput.placeholder = `Current key: ${data.api_key_preview} (enter new to replace)`;
+      apiKeyStatus.textContent = 'API key configured.';
+      apiKeyStatus.style.color = 'var(--green)';
+    } else {
+      apiKeyInput.placeholder = 'sk-ant-…';
+      apiKeyStatus.textContent = 'No API key set — AI features will use programmatic fallback.';
+      apiKeyStatus.style.color = 'var(--yellow)';
+    }
+  } catch {}
+}
+
+// ── Variant generation ────────────────────────────────────────────────────────
+
+variantsBtn.addEventListener('click', async () => {
+  const query = input.value.trim();
+  if (!query) return;
+  await showVariantTray(variantTray, query, null);
+});
+
+async function showVariantTray(trayEl, inputVal, context) {
+  trayEl.classList.remove('hidden');
+  trayEl.innerHTML = `<div class="variant-tray-loading">Generating variants…</div>`;
+
+  try {
+    const res = await fetch('/api/generate-variants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input: inputVal, context }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    renderVariantTray(trayEl, data);
+  } catch (err) {
+    trayEl.innerHTML = `<div class="variant-tray-loading" style="color:var(--red)">Failed: ${esc(err.message)}</div>`;
+  }
+}
+
+function renderVariantTray(trayEl, data) {
+  const usernames = data.username_variants ?? [];
+  const realnames = data.realname_variants ?? [];
+
+  if (!usernames.length && !realnames.length) {
+    trayEl.innerHTML = `<div class="variant-tray-loading">No variants generated.</div>`;
+    return;
+  }
+
+  let html = `<div class="variant-tray-header">Click a variant to search it</div>`;
+
+  if (usernames.length) {
+    html += `<div class="variant-section">
+      <div class="variant-section-label">Username variants</div>
+      <div class="variant-chips">
+        ${usernames.map(v => `<button class="variant-chip" data-value="${esc(v)}">${esc(v)}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (realnames.length) {
+    html += `<div class="variant-section">
+      <div class="variant-section-label">Real-name searches</div>
+      <div class="variant-chips">
+        ${realnames.map(v => `<button class="variant-chip" data-value="${esc(v)}">${esc(v)}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  trayEl.innerHTML = html;
+
+  trayEl.querySelectorAll('.variant-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (chip.classList.contains('used')) return;
+      chip.classList.add('used');
+      startSearch(chip.dataset.value);
+    });
+  });
+}
+
 // ── Search ────────────────────────────────────────────────────────────────────
 
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const query = input.value.trim();
-  if (query) startSearch(query);
+  if (!query) return;
+  startSearch(query);
+
+  // Auto-variants: check setting and trigger if enabled
+  try {
+    const res = await fetch('/api/settings');
+    const cfg = await res.json();
+    if (cfg.auto_search_variants) {
+      await showVariantTray(variantTray, query, null);
+    } else {
+      variantTray.classList.add('hidden');
+    }
+  } catch {
+    variantTray.classList.add('hidden');
+  }
 });
 
 function startSearch(query) {
@@ -198,12 +337,25 @@ function onIdentityDiscovered(data) {
     if (empty) empty.remove();
 
     const hint = data.hint_platform ? ` · ${esc(data.hint_platform)}` : '';
+    const itemId = `uid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     list.insertAdjacentHTML('beforeend', `
       <div class="unique-id-item">
         <span class="identity-type-badge">${esc(data.value_type)}</span>
         <span class="unique-id-value">${esc(data.value)}</span>
         <span class="unique-id-source">via ${esc(data.source_platform)}${hint}</span>
-      </div>`);
+        <button class="identity-variants-btn" data-value="${esc(data.value)}" data-context="${esc(data.source_platform)}" data-tray="${itemId}">&#10024; Variants</button>
+      </div>
+      <div class="identity-variant-tray" id="${itemId}"></div>`);
+
+    const newBtn = list.querySelector(`[data-tray="${itemId}"]`);
+    if (newBtn) {
+      newBtn.addEventListener('click', async () => {
+        const tray = document.getElementById(itemId);
+        if (tray.classList.contains('open')) { tray.classList.remove('open'); return; }
+        tray.classList.add('open');
+        await showVariantTray(tray, newBtn.dataset.value, newBtn.dataset.context);
+      });
+    }
 
     if (countEl) countEl.textContent = list.querySelectorAll('.unique-id-item').length;
   }

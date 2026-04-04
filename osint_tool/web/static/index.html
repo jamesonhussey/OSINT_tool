@@ -8,7 +8,7 @@
 </head>
 <body>
   <div class="container">
-    <header>
+    <header class="site-header">
       <pre class="banner">
   ___  ____ ___ _   _ _____   _____ ___   ___  _
  / _ \/ ___|_ _| \ | |_   _| |_   _/ _ \ / _ \| |
@@ -16,6 +16,7 @@
 | |_| |___) | || |\  | | |     | || |_| | |_| | |___
  \___/|____/___|_| \_| |_|     |_| \___/ \___/|_____|
       </pre>
+      <button id="settings-btn" class="settings-btn" title="Settings">&#9881;</button>
     </header>
 
     <form id="search-form">
@@ -33,12 +34,45 @@
         <button type="button" id="cap-btn" class="cap-btn active">
           &#9889; 100 Hop Cap
         </button>
+        <button type="button" id="variants-btn" class="cap-btn">
+          &#10024; Generate Variants
+        </button>
         <span class="cap-hint">Stops multi-hop discovery at 100 seeds to prevent runaway searches</span>
       </div>
     </form>
 
+    <div id="variant-tray" class="variant-tray hidden"></div>
     <div id="status" class="status hidden"></div>
     <div id="results" class="hidden"></div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Settings</span>
+        <button id="settings-close" class="modal-close">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label class="setting-label">Anthropic API Key</label>
+          <div class="api-key-row">
+            <input id="api-key-input" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          </div>
+          <div id="api-key-status" class="setting-hint"></div>
+        </div>
+        <div class="setting-group">
+          <label class="toggle-label">
+            <input id="auto-variants-toggle" type="checkbox" />
+            <span>Auto-generate &amp; search variants for first input</span>
+          </label>
+          <div class="setting-hint">Automatically runs variant generation when you submit a search</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="settings-save">Save</button>
+      </div>
+    </div>
   </div>
 
   <script src="/static/app.js"></script>

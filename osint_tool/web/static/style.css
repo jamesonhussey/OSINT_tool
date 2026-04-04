@@ -729,3 +729,253 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   font-size: 0.82rem;
   padding: 0.25rem 0;
 }
+
+/* ── Site header ────────────────────────────────────────────────────────── */
+
+.site-header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.site-header .banner {
+  margin-bottom: 0;
+}
+
+/* ── Settings button ────────────────────────────────────────────────────── */
+
+.settings-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-top: 0.1rem;
+  padding: 0.35rem 0.5rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.settings-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* ── Settings modal ─────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.65);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 100;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 380px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.modal-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 600;
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+  padding: 0.75rem 1rem;
+  text-transform: uppercase;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.1rem 0.3rem;
+}
+
+.modal-close:hover { color: var(--text); opacity: 1; }
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.1rem 1rem;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.setting-label {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.api-key-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.api-key-row input {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.setting-hint {
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+.toggle-label {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 14px;
+  width: 14px;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.65rem 1rem;
+}
+
+.modal-footer button {
+  font-size: 0.85rem;
+  padding: 0.45rem 1.2rem;
+}
+
+/* ── Variant tray ───────────────────────────────────────────────────────── */
+
+.variant-tray {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.variant-tray.hidden { display: none; }
+
+.variant-tray-header {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+}
+
+.variant-section {
+  margin-bottom: 0.6rem;
+}
+
+.variant-section:last-child { margin-bottom: 0; }
+
+.variant-section-label {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.variant-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.75rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.variant-chip:hover {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.variant-chip.used {
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.variant-tray-loading {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+/* ── Inline variant button on identity items ────────────────────────────── */
+
+.identity-variants-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.68rem;
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.identity-variants-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+}
+
+.identity-variant-tray {
+  background: rgba(88, 166, 255, 0.04);
+  border-bottom: 1px solid var(--border);
+  display: none;
+  padding: 0.5rem 1rem 0.6rem 2.5rem;
+}
+
+.identity-variant-tray.open { display: block; }

@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from osint_tool.core.engine import search
 from osint_tool.core.models import AccountResult, GravatarProfile, SearchResult
@@ -18,9 +19,23 @@ CONTENT_FETCHERS = {
 }
 
 STATIC_DIR = Path(__file__).parent / "static"
+CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 
 app = FastAPI(title="OSINT Tool")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def _load_config() -> dict:
+    if CONFIG_PATH.exists():
+        try:
+            return json.loads(CONFIG_PATH.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_config(data: dict) -> None:
+    CONFIG_PATH.write_text(json.dumps(data, indent=2))
 
 
 def _serialize_result(result: SearchResult) -> dict:
@@ -95,6 +110,48 @@ async def api_content(
 async def api_wayback(url: str = Query(..., min_length=1)):
     try:
         return await lookup_wayback(url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/settings")
+async def get_settings():
+    config = _load_config()
+    key = config.get("anthropic_api_key", "")
+    return {
+        "has_api_key": bool(key),
+        "api_key_preview": f"...{key[-4:]}" if len(key) > 4 else "",
+        "auto_search_variants": config.get("auto_search_variants", False),
+    }
+
+
+class SettingsUpdate(BaseModel):
+    anthropic_api_key: str | None = None
+    auto_search_variants: bool | None = None
+
+
+@app.post("/api/settings")
+async def update_settings(body: SettingsUpdate):
+    config = _load_config()
+    if body.anthropic_api_key is not None:
+        config["anthropic_api_key"] = body.anthropic_api_key
+    if body.auto_search_variants is not None:
+        config["auto_search_variants"] = body.auto_search_variants
+    _save_config(config)
+    return {"ok": True}
+
+
+class VariantsRequest(BaseModel):
+    input: str
+    context: str | None = None
+
+
+@app.post("/api/generate-variants")
+async def generate_variants(body: VariantsRequest):
+    from osint_tool.modules.alias_gen import generate_aliases
+    try:
+        result = await generate_aliases(body.input, body.context)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
