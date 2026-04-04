@@ -4,6 +4,17 @@ from pathlib import Path
 
 CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 
+_ANTHROPIC_IMPORT_ERROR = None
+try:
+    import anthropic as _anthropic_mod
+except ImportError as _e:
+    _anthropic_mod = None
+    _ANTHROPIC_IMPORT_ERROR = (
+        "anthropic package not found. "
+        "Run: .venv/Scripts/pip install anthropic>=0.25  "
+        "(make sure you're using the venv Python, not system Python)"
+    )
+
 
 def load_api_key() -> str | None:
     if CONFIG_PATH.exists():
@@ -14,18 +25,20 @@ def load_api_key() -> str | None:
     return None
 
 
+def _require_anthropic():
+    if _anthropic_mod is None:
+        raise ImportError(_ANTHROPIC_IMPORT_ERROR)
+
+
 async def generate_aliases(input_str: str, context: str | None = None) -> dict:
     api_key = load_api_key()
     if api_key:
-        try:
-            return await _ai_aliases(input_str, context, api_key)
-        except Exception:
-            pass
+        _require_anthropic()   # raises clearly if package missing
+        return await _ai_aliases(input_str, context, api_key)
     return _programmatic_aliases(input_str)
 
 
 async def generate_hybrids(seeds: list[dict]) -> dict:
-    """Generate hybrid username combinations from multiple known seeds."""
     api_key = load_api_key()
     if not api_key:
         return {
@@ -33,9 +46,8 @@ async def generate_hybrids(seeds: list[dict]) -> dict:
             "username_variants": [],
             "realname_variants": [],
         }
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    _require_anthropic()
+    client = _anthropic_mod.AsyncAnthropic(api_key=api_key)
     seed_lines = "\n".join(f'- "{s["value"]}" ({s["type"]})' for s in seeds)
 
     prompt = f"""These emails and usernames all belong to the same person:
@@ -63,7 +75,6 @@ Return only valid JSON, no explanation, no markdown fences."""
         max_tokens=768,
         messages=[{"role": "user", "content": prompt}],
     )
-
     text = message.content[0].text.strip()
     text = re.sub(r"^```(?:json)?\n?", "", text)
     text = re.sub(r"\n?```$", "", text)
@@ -71,9 +82,7 @@ Return only valid JSON, no explanation, no markdown fences."""
 
 
 async def _ai_aliases(input_str: str, context: str | None, api_key: str) -> dict:
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = _anthropic_mod.AsyncAnthropic(api_key=api_key)
 
     context_line = f"\nContext: this was found on {context}." if context else ""
     prompt = f"""Analyze this email or username and generate creative username variations: "{input_str}"{context_line}
@@ -99,7 +108,6 @@ Return only valid JSON, no explanation, no markdown fences."""
         max_tokens=640,
         messages=[{"role": "user", "content": prompt}],
     )
-
     text = message.content[0].text.strip()
     text = re.sub(r"^```(?:json)?\n?", "", text)
     text = re.sub(r"\n?```$", "", text)
@@ -123,20 +131,20 @@ def _programmatic_aliases(input_str: str) -> dict:
     for sep in [".", "_", "-", ""]:
         variants.add(re.sub(r"[.\-_]", sep, username))
 
-    # Adjacent number variants
+    # Adjacent number variants + year expansion
     m = re.search(r"\d+$", username)
     if m:
         n = int(m.group())
         base = username[: m.start()]
         for delta in [-2, -1, 1, 2]:
             variants.add(f"{base}{n + delta}")
-        # 2-digit year → full year
         if 0 <= n <= 99:
             variants.add(f"{base}{1900 + n}")
             variants.add(f"{base}{2000 + n}")
 
     result = sorted(
-        v for v in variants if len(v) > 1 and v.lower() != input_str.lower() and v.lower() != username.lower()
+        v for v in variants
+        if len(v) > 1 and v.lower() != input_str.lower() and v.lower() != username.lower()
     )
     return {
         "components": {"first_name": "", "last_name": "", "numbers": "", "number_meaning": "none"},

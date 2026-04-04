@@ -1034,6 +1034,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   font-style: italic;
 }
 
+.variant-tray-error {
+  background: rgba(248, 81, 73, 0.08);
+  border-left: 3px solid var(--red);
+  border-radius: 0 4px 4px 0;
+  color: var(--red);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+}
+
 /* ── Inline variant button on identity items ────────────────────────────── */
 
 .identity-variants-btn {

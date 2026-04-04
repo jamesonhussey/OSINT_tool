@@ -33,14 +33,19 @@ capBtn.addEventListener('click', () => {
   capBtn.classList.toggle('active', capEnabled);
 });
 
-// ── Collapse All ───────────────────────────────────────────────────────────────
+// ── Collapse / Expand All ──────────────────────────────────────────────────────
+
+let _allCollapsed = false;
 
 collapseAllBtn.addEventListener('click', () => {
-  document.querySelectorAll('.search-block-body').forEach(b => b.classList.add('collapsed'));
+  _allCollapsed = !_allCollapsed;
+  document.querySelectorAll('.search-block-body').forEach(b =>
+    b.classList.toggle('collapsed', _allCollapsed));
   document.querySelectorAll('.block-collapse-btn').forEach(btn => {
-    btn.classList.remove('active');
-    btn.innerHTML = '&#9654;';
+    btn.classList.toggle('active', !_allCollapsed);
+    btn.innerHTML = _allCollapsed ? '&#9654;' : '&#9660;';
   });
+  collapseAllBtn.innerHTML = _allCollapsed ? '&#9654; Expand All' : '&#9660; Collapse All';
 });
 
 // ── Generate Hybrids ──────────────────────────────────────────────────────────
@@ -69,7 +74,7 @@ hybridsBtn.addEventListener('click', async () => {
     const data = await res.json();
     renderVariantTray(hybridTray, data, null, data.analysis);
   } catch (err) {
-    hybridTray.innerHTML = `<div class="variant-tray-loading" style="color:var(--red)">Failed: ${esc(err.message)}</div>`;
+    hybridTray.innerHTML = `<div class="variant-tray-error">&#9888; ${esc(err.message)}</div>`;
   }
 });
 
@@ -432,11 +437,14 @@ async function showVariantTray(trayEl, inputVal, context, parentBlockEl) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ input: inputVal, context }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.detail ?? `HTTP ${res.status}`);
+    }
     const data = await res.json();
     renderVariantTray(trayEl, data, parentBlockEl, null);
   } catch (err) {
-    trayEl.innerHTML = `<div class="variant-tray-loading" style="color:var(--red)">Failed: ${esc(err.message)}</div>`;
+    trayEl.innerHTML = `<div class="variant-tray-error">&#9888; ${esc(err.message)}</div>`;
   }
 }
 

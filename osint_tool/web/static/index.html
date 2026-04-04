@@ -31,16 +31,18 @@
         <button type="submit">Search</button>
       </div>
       <div class="search-options-row">
-        <button type="button" id="cap-btn" class="cap-btn active">
-          &#9889; 100 Hop Cap
-        </button>
-        <button type="button" id="hybrids-btn" class="cap-btn">
-          &#9881; Generate Hybrids
-        </button>
-        <button type="button" id="collapse-all-btn" class="cap-btn">
+        <button type="button" id="collapse-all-btn" class="cap-btn"
+          title="Collapse or expand all search blocks">
           &#9660; Collapse All
         </button>
-        <span class="cap-hint">Hybrids synthesise patterns across all current searches</span>
+        <button type="button" id="cap-btn" class="cap-btn active"
+          title="Stops multi-hop discovery at 100 seeds to prevent runaway searches">
+          &#9889; 100 Hop Cap
+        </button>
+        <button type="button" id="hybrids-btn" class="cap-btn"
+          title="Analyse patterns across all visible searches and generate cross-seed username combinations">
+          &#9881; Generate Hybrids
+        </button>
       </div>
     </form>
 
