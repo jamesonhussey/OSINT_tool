@@ -730,6 +730,91 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   padding: 0.25rem 0;
 }
 
+/* ── Search blocks ──────────────────────────────────────────────────────── */
+
+.search-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.search-block-header {
+  align-items: center;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+}
+
+.search-block-query {
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-block-actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.35rem;
+}
+
+.block-delete-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.block-delete-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+  opacity: 1;
+}
+
+.block-variants-btn,
+.block-collapse-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.search-block-body.collapsed { display: none; }
+
+.block-variant-tray {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.85rem;
+}
+
+.block-variant-tray.hidden { display: none; }
+
+.child-searches {
+  padding: 0 0 0 1.25rem;
+}
+
+.child-searches:empty { display: none; }
+
+/* ── Variant analysis note ──────────────────────────────────────────────── */
+
+.variant-analysis {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
 /* ── Site header ────────────────────────────────────────────────────────── */
 
 .site-header {

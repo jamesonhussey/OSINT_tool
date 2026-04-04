@@ -156,6 +156,20 @@ async def generate_variants(body: VariantsRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class HybridsRequest(BaseModel):
+    seeds: list[dict]
+
+
+@app.post("/api/generate-hybrids")
+async def generate_hybrids_endpoint(body: HybridsRequest):
+    from osint_tool.modules.alias_gen import generate_hybrids
+    try:
+        result = await generate_hybrids(body.seeds)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/search/stream")
 async def search_stream(
     q: str = Query(..., min_length=1),

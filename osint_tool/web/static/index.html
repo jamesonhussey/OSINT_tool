@@ -34,16 +34,19 @@
         <button type="button" id="cap-btn" class="cap-btn active">
           &#9889; 100 Hop Cap
         </button>
-        <button type="button" id="variants-btn" class="cap-btn">
-          &#10024; Generate Variants
+        <button type="button" id="hybrids-btn" class="cap-btn">
+          &#9881; Generate Hybrids
         </button>
-        <span class="cap-hint">Stops multi-hop discovery at 100 seeds to prevent runaway searches</span>
+        <button type="button" id="collapse-all-btn" class="cap-btn">
+          &#9660; Collapse All
+        </button>
+        <span class="cap-hint">Hybrids synthesise patterns across all current searches</span>
       </div>
     </form>
 
-    <div id="variant-tray" class="variant-tray hidden"></div>
+    <div id="hybrid-tray" class="variant-tray hidden"></div>
     <div id="status" class="status hidden"></div>
-    <div id="results" class="hidden"></div>
+    <div id="results"></div>
   </div>
 
   <!-- Settings modal -->
@@ -64,9 +67,9 @@
         <div class="setting-group">
           <label class="toggle-label">
             <input id="auto-variants-toggle" type="checkbox" />
-            <span>Auto-generate &amp; search variants for first input</span>
+            <span>Auto-generate variants for first input</span>
           </label>
-          <div class="setting-hint">Automatically runs variant generation when you submit a search</div>
+          <div class="setting-hint">Automatically opens the variant tray when you submit a search</div>
         </div>
       </div>
       <div class="modal-footer">
