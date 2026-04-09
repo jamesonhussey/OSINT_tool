@@ -41,3 +41,6 @@ osint_tool/
 - Modular: each data source is its own module, easy to add/remove
 - Extensible: architecture supports adding paid API integrations later
 - CLI-first: clean terminal output, web UI can come later
+
+## Planning & hardening
+- **Backlog and deferred security work:** see [`docs/PLANNING.md`](../docs/PLANNING.md) (API keys, gitignore, web exposure, rate limits, etc.).

@@ -5,8 +5,14 @@ Each resolver accepts a username and returns a list of discovered identities:
     [{"value": str, "type": "email"|"username", "source": str, "hint_platform": str|None}, ...]
 
 Only platforms with freely-accessible APIs or public profile data are implemented.
+For all other platforms, the rule-based extraction system (resolve_via_rules)
+acts as a generic fallback using cached LLM-learned selectors.
 """
 import re
+from datetime import datetime, timezone
+import json
+from urllib.parse import urlparse
+
 import aiohttp
 
 GITHUB_HEADERS = {
@@ -212,11 +218,160 @@ _RESOLVERS: dict[str, any] = {
     'Pinterest': resolve_pinterest,
 }
 
+MAX_FAIL_BEFORE_SKIP = 3
 
-async def resolve_platform(platform, username: str) -> list[dict]:
-    """Run the resolver for a platform, if one exists. Returns [] otherwise."""
+
+async def resolve_platform(
+    platform,
+    username: str,
+    html_body: str | None = None,
+    url: str | None = None,
+) -> tuple[list[dict], dict | None]:
+    """Run the resolver for a platform, then rule-based extraction if HTML available.
+
+    Hand-written resolvers always run first.  Rule-based extraction (cached
+    selectors + LLM fallback) runs on any HTML we captured, merging results.
+
+    Returns (identities, extraction_activity) where extraction_activity is set
+    when HTML-based extraction ran (cached rules, LLM, skip, or failure).
+    """
     name = platform.value if hasattr(platform, 'value') else str(platform)
+
+    identities: list[dict] = []
+    extraction_activity: dict | None = None
+
     fn = _RESOLVERS.get(name)
-    if fn is None:
-        return []
-    return await fn(username)
+    if fn is not None:
+        identities = await fn(username)
+
+    if html_body and url:
+        rule_identities, activity = await resolve_via_rules(url, html_body, username)
+        identities.extend(rule_identities)
+        if activity is not None:
+            extraction_activity = activity
+            extraction_activity["platform"] = name
+
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict] = []
+    for ident in identities:
+        key = (ident["value"].lower(), ident.get("type", ""))
+        if key not in seen:
+            seen.add(key)
+            unique.append(ident)
+
+    return unique, extraction_activity
+
+
+def _llm_preview(llm_result: dict) -> str:
+    """Compact JSON for UI (truncated)."""
+    slim = {
+        "identities": llm_result.get("identities", []),
+        "methods": llm_result.get("methods", []),
+    }
+    text = json.dumps(slim, indent=2, ensure_ascii=False)
+    if len(text) > 4000:
+        return text[:4000] + "\n… [truncated]"
+    return text
+
+
+async def resolve_via_rules(
+    profile_url: str, html_body: str, username: str,
+) -> tuple[list[dict], dict | None]:
+    """Extract identities using cached rules or LLM learning for the domain.
+
+    Second return value is telemetry for the UI (SSE), or None if nothing to report.
+    """
+    from osint_tool.data.rule_cache import get_rule_cache
+    from osint_tool.data.rule_schema import ExtractionMethod, SiteRule
+    from osint_tool.modules.extraction_runner import run_extraction
+    from osint_tool.modules.html_cleaner import clean_html
+    from osint_tool.modules.llm_extractor import has_api_key, llm_extract
+
+    domain = urlparse(profile_url).netloc.lstrip("www.")
+    if not domain:
+        return [], None
+
+    cache = get_rule_cache()
+    rule = cache.get(domain)
+
+    cleaned_html, json_ld_blocks, fingerprint = clean_html(html_body)
+
+    # Try cached rule if it exists, isn't skipped, and isn't flagged
+    if rule and not rule.skip and not rule.needs_relearn:
+        result = run_extraction(rule, cleaned_html, json_ld_blocks, fingerprint)
+        if not result.stale:
+            return result.identities, {
+                "domain": domain,
+                "mode": "cached_rules",
+                "identities_found": len(result.identities),
+                "methods_in_rule": len(rule.methods),
+                "stale": False,
+                "message": f"Used cached selectors for {domain} — {len(result.identities)} identity/ies.",
+            }
+        # Rule is stale — fall through to LLM re-learn
+
+    if rule and rule.skip:
+        return [], {
+            "domain": domain,
+            "mode": "skipped",
+            "reason": rule.skip_reason or "site marked skip",
+            "message": f"Skipped {domain} — {rule.skip_reason or 'extraction disabled for this domain'}.",
+        }
+
+    if not has_api_key():
+        return [], {
+            "domain": domain,
+            "mode": "no_api_key",
+            "message": f"No API key — cannot run LLM extraction for {domain} (bundled rules still apply if present).",
+        }
+
+    # LLM extraction (first visit or stale rule)
+    llm_result = await llm_extract(domain, cleaned_html, json_ld_blocks)
+
+    if llm_result is None:
+        fail_count = 0
+        if rule:
+            fail_count = cache.increment_fail_count(domain)
+            if fail_count >= MAX_FAIL_BEFORE_SKIP:
+                cache.mark_skip(domain, f"LLM extraction failed {fail_count} consecutive times")
+        return [], {
+            "domain": domain,
+            "mode": "llm_failed",
+            "fail_count": fail_count,
+            "message": f"LLM call failed or returned invalid JSON for {domain}.",
+        }
+
+    methods = [ExtractionMethod.from_dict(m) for m in llm_result.get("methods", [])]
+    new_rule = SiteRule(
+        domain=domain,
+        version=(rule.version + 1) if rule else 1,
+        updated_at=datetime.now(timezone.utc).isoformat(),
+        fingerprint=fingerprint,
+        methods=methods,
+        needs_relearn=False,
+        fail_count=0,
+    )
+    cache.save_rule(new_rule)
+
+    identities: list[dict] = []
+    for ident in llm_result.get("identities", []):
+        if not ident.get("value"):
+            continue
+        identities.append({
+            "value": ident["value"],
+            "type": ident.get("type", "username"),
+            "hint_platform": ident.get("hint_platform"),
+            "source": f"LLM extraction ({domain})",
+        })
+
+    return identities, {
+        "domain": domain,
+        "mode": "llm",
+        "identities_found": len(identities),
+        "methods_learned": len(methods),
+        "preview": _llm_preview(llm_result),
+        "message": (
+            f"LLM extraction for {domain} — {len(identities)} identity/ies, "
+            f"{len(methods)} rule method(s) saved to local cache."
+        ),
+    }

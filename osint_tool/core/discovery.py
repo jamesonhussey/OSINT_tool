@@ -164,7 +164,18 @@ class DiscoveryEngine:
                 }
 
                 if account.status == AccountStatus.FOUND:
-                    identities = await resolve_platform(account.platform, account.username)
+                    identities, extraction_activity = await resolve_platform(
+                        account.platform, account.username,
+                        html_body=account.html_body, url=account.url,
+                    )
+                    if extraction_activity:
+                        yield 'extraction_activity', {
+                            'hop': item.hop,
+                            'seed': item.seed,
+                            'username': account.username,
+                            'url': account.url,
+                            **extraction_activity,
+                        }
                     for identity in identities:
                         queued = self._enqueue(
                             identity['value'],

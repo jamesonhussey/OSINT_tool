@@ -1,0 +1,237 @@
+{
+  "rules": [
+    {
+      "domain": "steamcommunity.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": ".profile_summary_links a[href]",
+          "attr": "href"
+        },
+        {
+          "type": "xpath",
+          "identity_type": "url",
+          "expr": "//div[contains(@class,'profile_summary')]//a/@href"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:www\\.)?(?:twitter|x)\\.com/([\\w]{1,50})",
+          "group": 0,
+          "hint_platform": "Twitter/X"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:www\\.)?youtube\\.com/@([\\w-]{3,30})",
+          "group": 0,
+          "hint_platform": "YouTube"
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "medium.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "json_ld",
+          "identity_type": "url",
+          "path": "$.sameAs[*]"
+        },
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": "a[href*='twitter.com'], a[href*='x.com'], a[href*='github.com']",
+          "attr": "href"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:twitter|x)\\.com/(?:@)?([\\w]{1,50})(?:[/?#]|$)",
+          "group": 0,
+          "hint_platform": "Twitter/X"
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "news.ycombinator.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": "tr.athing td a[href]:not([href^='item']):not([href^='user'])",
+          "attr": "href"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://github\\.com/([\\w][\\w-]{0,38})(?:[/?#]|$)",
+          "group": 0,
+          "hint_platform": "GitHub"
+        },
+        {
+          "type": "regex",
+          "identity_type": "email",
+          "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+          "group": 0
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "keybase.io",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": "a.social-proof-link[href]",
+          "attr": "href"
+        },
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": ".profile-proof a[href*='twitter.com'], .profile-proof a[href*='github.com'], .profile-proof a[href*='reddit.com']",
+          "attr": "href"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:twitter|x)\\.com/(?:@)?([\\w]{1,50})",
+          "group": 0,
+          "hint_platform": "Twitter/X"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://github\\.com/([\\w][\\w-]{0,38})",
+          "group": 0,
+          "hint_platform": "GitHub"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:www\\.)?reddit\\.com/u(?:ser)?/([\\w-]{3,20})",
+          "group": 0,
+          "hint_platform": "Reddit"
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "gitlab.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": ".profile-link-holder a[href], .user-profile a[href*='twitter'], .user-profile a[href*='linkedin']",
+          "attr": "href"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://(?:twitter|x)\\.com/(?:@)?([\\w]{1,50})",
+          "group": 0,
+          "hint_platform": "Twitter/X"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "https?://github\\.com/([\\w][\\w-]{0,38})",
+          "group": 0,
+          "hint_platform": "GitHub"
+        },
+        {
+          "type": "regex",
+          "identity_type": "email",
+          "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+          "group": 0
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "pinterest.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "json_ld",
+          "identity_type": "url",
+          "path": "$.sameAs[*]"
+        },
+        {
+          "type": "regex",
+          "identity_type": "username",
+          "pattern": "\"username\"\\s*:\\s*\"([\\w.]{3,50})\"",
+          "group": 1,
+          "hint_platform": "Pinterest"
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "instagram.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "json_ld",
+          "identity_type": "url",
+          "path": "$.sameAs[*]"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "\"external_url\"\\s*:\\s*\"(https?://[^\"]+)\"",
+          "group": 1
+        }
+      ],
+      "skip": false
+    },
+    {
+      "domain": "tiktok.com",
+      "version": 1,
+      "updated_at": "2026-04-08T00:00:00Z",
+      "fingerprint": "",
+      "methods": [
+        {
+          "type": "json_ld",
+          "identity_type": "url",
+          "path": "$.sameAs[*]"
+        },
+        {
+          "type": "regex",
+          "identity_type": "url",
+          "pattern": "\"bioLink\"\\s*:\\s*\\{[^}]*\"link\"\\s*:\\s*\"(https?://[^\"]+)\"",
+          "group": 1
+        },
+        {
+          "type": "css",
+          "identity_type": "url",
+          "selector": "a[href*='instagram.com'], a[href*='youtube.com'], a[href*='twitter.com']",
+          "attr": "href"
+        }
+      ],
+      "skip": false
+    }
+  ]
+}

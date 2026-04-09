@@ -29,6 +29,7 @@ class AccountResult:
     url: str
     status: AccountStatus
     extra_info: dict = field(default_factory=dict)
+    html_body: str | None = field(default=None, repr=False)
 
 
 @dataclass

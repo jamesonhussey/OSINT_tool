@@ -122,6 +122,7 @@ async def get_settings():
         "has_api_key": bool(key),
         "api_key_preview": f"...{key[-4:]}" if len(key) > 4 else "",
         "auto_search_variants": config.get("auto_search_variants", False),
+        "extraction_mode": "full" if key else "basic",
     }
 
 
@@ -141,6 +142,14 @@ async def update_settings(body: SettingsUpdate):
     return {"ok": True}
 
 
+@app.post("/api/reset-extraction-cache")
+async def reset_extraction_cache():
+    """Remove local_rules.json so only bundled default_rules.json applies until the LLM learns again."""
+    from osint_tool.data.rule_cache import reset_local_rules
+    reset_local_rules()
+    return {"ok": True, "message": "Local extraction cache cleared. Restart not required."}
+
+
 class VariantsRequest(BaseModel):
     input: str
     context: str | None = None
@@ -154,6 +163,21 @@ async def generate_variants(body: VariantsRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class FlagIdentityRequest(BaseModel):
+    domain: str
+    identity_value: str
+    reason: str | None = None
+
+
+@app.post("/api/flag-identity")
+async def flag_identity(body: FlagIdentityRequest):
+    """Mark a domain's extraction rule for re-learning."""
+    from osint_tool.data.rule_cache import get_rule_cache
+    cache = get_rule_cache()
+    cache.mark_needs_relearn(body.domain)
+    return {"ok": True, "domain": body.domain}
 
 
 class HybridsRequest(BaseModel):

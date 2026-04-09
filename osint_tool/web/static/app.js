@@ -25,6 +25,9 @@ const settingsSave     = document.getElementById('settings-save');
 const apiKeyInput      = document.getElementById('api-key-input');
 const apiKeyStatus     = document.getElementById('api-key-status');
 const autoVariantsToggle = document.getElementById('auto-variants-toggle');
+const extractionNotice = document.getElementById('extraction-notice');
+const resetExtractionBtn   = document.getElementById('reset-extraction-cache-btn');
+const resetExtractionStatus = document.getElementById('reset-extraction-status');
 
 // ── Cap toggle ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +99,23 @@ settingsBtn.addEventListener('click', openSettings);
 settingsClose.addEventListener('click', () => settingsModal.classList.add('hidden'));
 settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
 
+resetExtractionBtn?.addEventListener('click', async () => {
+  resetExtractionBtn.disabled = true;
+  resetExtractionStatus.textContent = 'Resetting…';
+  resetExtractionStatus.style.color = 'var(--text-muted)';
+  try {
+    const res = await fetch('/api/reset-extraction-cache', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    resetExtractionStatus.textContent = data.message || 'Local cache cleared.';
+    resetExtractionStatus.style.color = 'var(--green)';
+  } catch (e) {
+    resetExtractionStatus.textContent = String(e.message);
+    resetExtractionStatus.style.color = 'var(--red)';
+  }
+  resetExtractionBtn.disabled = false;
+});
+
 settingsSave.addEventListener('click', async () => {
   settingsSave.disabled = true;
   settingsSave.textContent = 'Saving…';
@@ -131,13 +151,19 @@ async function loadSettings() {
       apiKeyInput.placeholder = `Current key: ${data.api_key_preview} — enter new to replace`;
       apiKeyStatus.textContent = 'API key configured.';
       apiKeyStatus.style.color = 'var(--green)';
+      extractionNotice.classList.add('hidden');
     } else {
       apiKeyInput.placeholder = 'sk-ant-…';
       apiKeyStatus.textContent = 'No API key — AI features will use programmatic fallback.';
       apiKeyStatus.style.color = 'var(--yellow)';
+      extractionNotice.textContent = 'Running in basic mode \u2014 profile existence only, no identity extraction. Configure an API key in Settings to enable LLM-powered extraction.';
+      extractionNotice.classList.remove('hidden');
     }
   } catch {}
 }
+
+// Check extraction mode on page load
+loadSettings();
 
 // ── Form submit ────────────────────────────────────────────────────────────────
 
@@ -263,6 +289,15 @@ function runSSESearch(query, blockEl) {
           <span class="unique-id-empty">None discovered yet…</span>
         </div>
       </div>
+      <div class="section extraction-activity-section">
+        <div class="section-header extraction-activity-header" onclick="toggleSection(this)">
+          <span class="tree-collapse-icon">&#9660;</span>
+          Extraction activity
+        </div>
+        <div class="extraction-activity-log">
+          <span class="extraction-activity-empty">No HTML extraction steps yet…</span>
+        </div>
+      </div>
       <div class="discovery-tree"></div>`;
   });
 
@@ -294,6 +329,36 @@ function runSSESearch(query, blockEl) {
     localHopEls.set(data.seed.toLowerCase(), el);
     localCurrentHopEl = el;
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  on('extraction_activity', data => {
+    const log = resultsDiv.querySelector('.extraction-activity-log');
+    if (!log) return;
+    log.querySelector('.extraction-activity-empty')?.remove();
+
+    const mode    = data.mode || '';
+    const isLlm   = mode === 'llm';
+    const badge   = isLlm ? 'llm-badge' : 'cache-badge';
+    const summary = data.message || `${mode} · ${data.domain || ''}`;
+
+    const row = document.createElement('div');
+    row.className = 'extraction-activity-row';
+    row.innerHTML = `
+      <div class="extraction-activity-meta">
+        <span class="extraction-activity-badge ${badge}">${esc(mode)}</span>
+        <span class="extraction-activity-platform">${esc(data.platform || '')}</span>
+        <span class="extraction-activity-domain">${esc(data.domain || '')}</span>
+      </div>
+      <div class="extraction-activity-summary">${esc(summary)}</div>`;
+
+    if (data.preview) {
+      const pre = document.createElement('pre');
+      pre.className = 'extraction-activity-preview';
+      pre.textContent = data.preview;
+      row.appendChild(pre);
+    }
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
   });
 
   on('gravatar', data => {
@@ -358,11 +423,18 @@ function runSSESearch(query, blockEl) {
       const hint   = data.hint_platform ? ` · ${esc(data.hint_platform)}` : '';
       const itemId = `uid-${drawerCounter++}`;
 
+      const sourceDomain = data.source_platform ? platformToDomain(data.source_platform) : '';
+
       list.insertAdjacentHTML('beforeend', `
-        <div class="unique-id-item">
+        <div class="unique-id-item" id="uid-item-${itemId}">
           <span class="identity-type-badge">${esc(data.value_type)}</span>
           <span class="unique-id-value">${esc(data.value)}</span>
           <span class="unique-id-source">via ${esc(data.source_platform)}${hint}</span>
+          <button class="identity-flag-btn"
+            data-domain="${esc(sourceDomain)}"
+            data-value="${esc(data.value)}"
+            data-item="uid-item-${itemId}"
+            title="Flag this identity as incorrect">&#9873; Flag</button>
           <button class="identity-variants-btn"
             data-value="${esc(data.value)}"
             data-context="${esc(data.source_platform)}"
@@ -375,9 +447,11 @@ function runSSESearch(query, blockEl) {
         const tray = document.getElementById(itemId);
         if (tray.classList.contains('open')) { tray.classList.remove('open'); return; }
         tray.classList.add('open');
-        // nest variant searches under the same block
         await showVariantTray(tray, varBtn.dataset.value, varBtn.dataset.context, blockEl);
       });
+
+      const flagBtn = list.querySelector(`#uid-item-${itemId} .identity-flag-btn`);
+      flagBtn?.addEventListener('click', () => handleFlagIdentity(flagBtn));
 
       if (countEl) countEl.textContent = list.querySelectorAll('.unique-id-item').length;
     }
@@ -812,6 +886,50 @@ function attachTabListeners(drawer) {
       document.getElementById(target).classList.add('active');
     });
   });
+}
+
+// ── Flag identity ──────────────────────────────────────────────────────
+
+const PLATFORM_DOMAINS = {
+  'GitHub': 'github.com',
+  'Twitter/X': 'x.com',
+  'Instagram': 'instagram.com',
+  'Reddit': 'reddit.com',
+  'LinkedIn': 'linkedin.com',
+  'Pinterest': 'pinterest.com',
+  'TikTok': 'tiktok.com',
+  'YouTube': 'youtube.com',
+  'Steam': 'steamcommunity.com',
+  'Medium': 'medium.com',
+};
+
+function platformToDomain(platform) {
+  return PLATFORM_DOMAINS[platform] || platform.toLowerCase().replace(/[^a-z0-9.]/g, '') + '.com';
+}
+
+async function handleFlagIdentity(btn) {
+  if (btn.classList.contains('flagged')) return;
+  const domain = btn.dataset.domain;
+  const value  = btn.dataset.value;
+  const itemId = btn.dataset.item;
+
+  btn.disabled = true;
+  btn.textContent = 'Flagging…';
+
+  try {
+    await fetch('/api/flag-identity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain, identity_value: value }),
+    });
+    btn.classList.add('flagged');
+    btn.innerHTML = '&#9873; Flagged';
+    const item = document.getElementById(itemId);
+    if (item) item.classList.add('flagged');
+  } catch {
+    btn.textContent = 'Error';
+  }
+  btn.disabled = false;
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────

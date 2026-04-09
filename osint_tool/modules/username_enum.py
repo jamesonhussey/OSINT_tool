@@ -11,38 +11,42 @@ HEADERS = {
     )
 }
 
+CheckResult = tuple[AccountStatus, str | None]
+
 
 async def _check_by_status(
     session: aiohttp.ClientSession, url: str
-) -> AccountStatus:
+) -> CheckResult:
     """Simple check: 200 = found, anything else = not found."""
     async with session.get(
         url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10),
         allow_redirects=True,
     ) as resp:
-        return AccountStatus.FOUND if resp.status == 200 else AccountStatus.NOT_FOUND
+        if resp.status == 200:
+            body = await resp.text()
+            return AccountStatus.FOUND, body
+        return AccountStatus.NOT_FOUND, None
 
 
 async def _check_by_body(
     session: aiohttp.ClientSession, url: str, not_found_indicators: list[str]
-) -> AccountStatus:
+) -> CheckResult:
     """Check response body for not-found indicators. 200 + no indicators = found."""
     async with session.get(
         url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10),
         allow_redirects=True,
     ) as resp:
         if resp.status != 200:
-            return AccountStatus.NOT_FOUND
-        body = (await resp.text()).lower()
+            return AccountStatus.NOT_FOUND, None
+        body = await resp.text()
+        body_lower = body.lower()
         for indicator in not_found_indicators:
-            if indicator in body:
-                return AccountStatus.NOT_FOUND
-        return AccountStatus.FOUND
+            if indicator in body_lower:
+                return AccountStatus.NOT_FOUND, None
+        return AccountStatus.FOUND, body
 
 
-async def _check_github(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Use the REST API — more reliable than scraping the profile page (CDN/WAF
-    # often returns non-200 for automated requests on the web URL).
+async def _check_github(session: aiohttp.ClientSession, username: str) -> CheckResult:
     url = f"https://api.github.com/users/{username}"
     async with session.get(
         url,
@@ -50,15 +54,14 @@ async def _check_github(session: aiohttp.ClientSession, username: str) -> Accoun
         timeout=aiohttp.ClientTimeout(total=10),
     ) as resp:
         if resp.status == 200:
-            return AccountStatus.FOUND
+            return AccountStatus.FOUND, None  # API-based, no HTML
         elif resp.status == 404:
-            return AccountStatus.NOT_FOUND
+            return AccountStatus.NOT_FOUND, None
         else:
-            return AccountStatus.ERROR
+            return AccountStatus.ERROR, None
 
 
-async def _check_instagram(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Instagram returns 200 but body contains "Page Not Found" for missing users
+async def _check_instagram(session: aiohttp.ClientSession, username: str) -> CheckResult:
     return await _check_by_body(
         session,
         f"https://www.instagram.com/{username}/",
@@ -66,22 +69,20 @@ async def _check_instagram(session: aiohttp.ClientSession, username: str) -> Acc
     )
 
 
-async def _check_reddit(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Reddit's JSON about endpoint returns 200 for real users, non-200 for fake
+async def _check_reddit(session: aiohttp.ClientSession, username: str) -> CheckResult:
     url = f"https://www.reddit.com/user/{username}/about.json"
     async with session.get(
         url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10),
     ) as resp:
         if resp.status != 200:
-            return AccountStatus.NOT_FOUND
+            return AccountStatus.NOT_FOUND, None
         data = await resp.json()
-        # Suspended/shadowbanned accounts have "is_suspended": true
         if data.get("data", {}).get("is_suspended"):
-            return AccountStatus.NOT_FOUND
-        return AccountStatus.FOUND
+            return AccountStatus.NOT_FOUND, None
+        return AccountStatus.FOUND, None  # JSON API, no HTML
 
 
-async def _check_pinterest(session: aiohttp.ClientSession, username: str) -> AccountStatus:
+async def _check_pinterest(session: aiohttp.ClientSession, username: str) -> CheckResult:
     return await _check_by_body(
         session,
         f"https://www.pinterest.com/{username}/",
@@ -89,7 +90,7 @@ async def _check_pinterest(session: aiohttp.ClientSession, username: str) -> Acc
     )
 
 
-async def _check_tiktok(session: aiohttp.ClientSession, username: str) -> AccountStatus:
+async def _check_tiktok(session: aiohttp.ClientSession, username: str) -> CheckResult:
     return await _check_by_body(
         session,
         f"https://www.tiktok.com/@{username}",
@@ -97,13 +98,11 @@ async def _check_tiktok(session: aiohttp.ClientSession, username: str) -> Accoun
     )
 
 
-async def _check_youtube(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # YouTube returns 404 for non-existent channels
+async def _check_youtube(session: aiohttp.ClientSession, username: str) -> CheckResult:
     return await _check_by_status(session, f"https://www.youtube.com/@{username}")
 
 
-async def _check_steam(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Steam returns 200 for both, but body contains error text for missing profiles
+async def _check_steam(session: aiohttp.ClientSession, username: str) -> CheckResult:
     return await _check_by_body(
         session,
         f"https://steamcommunity.com/id/{username}",
@@ -111,43 +110,50 @@ async def _check_steam(session: aiohttp.ClientSession, username: str) -> Account
     )
 
 
-async def _check_medium(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Medium blocks most automated requests with 403; treat as unreliable
+async def _check_medium(session: aiohttp.ClientSession, username: str) -> CheckResult:
     url = f"https://medium.com/@{username}"
     async with session.get(
         url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10),
         allow_redirects=True,
     ) as resp:
         if resp.status == 200:
-            return AccountStatus.FOUND
+            body = await resp.text()
+            return AccountStatus.FOUND, body
         elif resp.status == 404:
-            return AccountStatus.NOT_FOUND
+            return AccountStatus.NOT_FOUND, None
         else:
-            # 403 or other — can't determine
-            return AccountStatus.ERROR
+            return AccountStatus.ERROR, None
 
 
-async def _check_twitter(session: aiohttp.ClientSession, username: str) -> AccountStatus:
-    # Twitter/X aggressively blocks automated requests
+async def _check_twitter(session: aiohttp.ClientSession, username: str) -> CheckResult:
     url = f"https://x.com/{username}"
     async with session.get(
         url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=10),
         allow_redirects=True,
     ) as resp:
         if resp.status == 200:
-            return AccountStatus.FOUND
+            body = await resp.text()
+            return AccountStatus.FOUND, body
         elif resp.status == 404:
-            return AccountStatus.NOT_FOUND
+            return AccountStatus.NOT_FOUND, None
         else:
-            return AccountStatus.ERROR
+            return AccountStatus.ERROR, None
 
 
-# Maps Platform -> (checker function, profile URL template)
+async def _check_linkedin(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.linkedin.com/in/{username}/",
+        ["page not found", "this page doesn't exist", "profile not found"],
+    )
+
+
 PLATFORM_CHECKS = [
     (Platform.GITHUB, _check_github, "https://github.com/{username}"),
     (Platform.TWITTER, _check_twitter, "https://x.com/{username}"),
     (Platform.INSTAGRAM, _check_instagram, "https://www.instagram.com/{username}/"),
     (Platform.REDDIT, _check_reddit, "https://www.reddit.com/user/{username}"),
+    (Platform.LINKEDIN, _check_linkedin, "https://www.linkedin.com/in/{username}/"),
     (Platform.PINTEREST, _check_pinterest, "https://www.pinterest.com/{username}/"),
     (Platform.TIKTOK, _check_tiktok, "https://www.tiktok.com/@{username}"),
     (Platform.YOUTUBE, _check_youtube, "https://www.youtube.com/@{username}"),
@@ -165,8 +171,11 @@ async def _check_one(
 ) -> AccountResult:
     url = url_template.format(username=username)
     try:
-        status = await checker(session, username)
-        return AccountResult(platform=platform, username=username, url=url, status=status)
+        status, html_body = await checker(session, username)
+        return AccountResult(
+            platform=platform, username=username, url=url,
+            status=status, html_body=html_body,
+        )
     except (aiohttp.ClientError, asyncio.TimeoutError):
         return AccountResult(
             platform=platform, username=username, url=url, status=AccountStatus.ERROR,

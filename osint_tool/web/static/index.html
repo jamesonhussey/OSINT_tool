@@ -47,6 +47,7 @@
     </form>
 
     <div id="hybrid-tray" class="variant-tray hidden"></div>
+    <div id="extraction-notice" class="extraction-notice hidden"></div>
     <div id="status" class="status hidden"></div>
     <div id="results"></div>
   </div>
@@ -72,6 +73,14 @@
             <span>Auto-generate variants for first input</span>
           </label>
           <div class="setting-hint">Automatically opens the variant tray when you submit a search</div>
+        </div>
+        <div class="setting-group">
+          <label class="setting-label">Extraction testing</label>
+          <button type="button" id="reset-extraction-cache-btn" class="danger-outline-btn">
+            Reset local extraction cache
+          </button>
+          <div class="setting-hint">Deletes <code>local_rules.json</code> so learned LLM rules are cleared. Bundled <code>default_rules.json</code> is unchanged. Use this to force fresh LLM runs.</div>
+          <div id="reset-extraction-status" class="setting-hint"></div>
         </div>
       </div>
       <div class="modal-footer">

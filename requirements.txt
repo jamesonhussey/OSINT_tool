@@ -4,3 +4,5 @@ colorama>=0.4
 fastapi>=0.111
 uvicorn>=0.29
 anthropic>=0.25
+beautifulsoup4>=4.12
+lxml>=5.0
