@@ -6,9 +6,8 @@ cached for future visits without further LLM involvement.
 """
 import json
 import re
-from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
+from osint_tool.core.config_loader import get_anthropic_api_key
 
 _ANTHROPIC_IMPORT_ERROR = None
 try:
@@ -21,17 +20,8 @@ except ImportError as _e:
     )
 
 
-def load_api_key() -> str | None:
-    if CONFIG_PATH.exists():
-        try:
-            return json.loads(CONFIG_PATH.read_text()).get("anthropic_api_key") or None
-        except Exception:
-            return None
-    return None
-
-
 def has_api_key() -> bool:
-    return bool(load_api_key())
+    return bool(get_anthropic_api_key())
 
 
 def _require_anthropic() -> None:
@@ -99,7 +89,7 @@ async def llm_extract(domain: str, cleaned_html: str, json_ld_blocks: list[dict]
     Returns dict with "identities" and "methods" keys, or None if no API key
     or extraction failed.
     """
-    api_key = load_api_key()
+    api_key = get_anthropic_api_key()
     if not api_key:
         return None
 

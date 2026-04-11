@@ -149,7 +149,11 @@ async function loadSettings() {
     autoVariantsToggle.checked = data.auto_search_variants;
     if (data.has_api_key) {
       apiKeyInput.placeholder = `Current key: ${data.api_key_preview} — enter new to replace`;
-      apiKeyStatus.textContent = 'API key configured.';
+      let statusText = 'API key configured.';
+      if (data.key_source === 'environment') {
+        statusText = 'Using ANTHROPIC_API_KEY from the environment (overrides config.json / Settings for runtime API calls). Saving in Settings still updates config.json.';
+      }
+      apiKeyStatus.textContent = statusText;
       apiKeyStatus.style.color = 'var(--green)';
       extractionNotice.classList.add('hidden');
     } else {

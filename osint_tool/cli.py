@@ -1,6 +1,10 @@
 import asyncio
 import click
+
+from osint_tool.core.config_loader import load_dotenv_once
 from osint_tool.core.engine import search
+
+load_dotenv_once()
 from osint_tool.output.formatter import print_results
 
 

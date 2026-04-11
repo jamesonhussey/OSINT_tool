@@ -1,8 +1,7 @@
 import json
 import re
-from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
+from osint_tool.core.config_loader import get_anthropic_api_key
 
 _ANTHROPIC_IMPORT_ERROR = None
 try:
@@ -16,22 +15,13 @@ except ImportError as _e:
     )
 
 
-def load_api_key() -> str | None:
-    if CONFIG_PATH.exists():
-        try:
-            return json.loads(CONFIG_PATH.read_text()).get("anthropic_api_key") or None
-        except Exception:
-            return None
-    return None
-
-
 def _require_anthropic():
     if _anthropic_mod is None:
         raise ImportError(_ANTHROPIC_IMPORT_ERROR)
 
 
 async def generate_aliases(input_str: str, context: str | None = None) -> dict:
-    api_key = load_api_key()
+    api_key = get_anthropic_api_key()
     if api_key:
         _require_anthropic()   # raises clearly if package missing
         return await _ai_aliases(input_str, context, api_key)
@@ -39,7 +29,7 @@ async def generate_aliases(input_str: str, context: str | None = None) -> dict:
 
 
 async def generate_hybrids(seeds: list[dict]) -> dict:
-    api_key = load_api_key()
+    api_key = get_anthropic_api_key()
     if not api_key:
         return {
             "analysis": "No API key configured — set one in Settings to use hybrid generation.",

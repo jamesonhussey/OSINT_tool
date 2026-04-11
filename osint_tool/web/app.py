@@ -6,9 +6,18 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from osint_tool.core.config_loader import (
+    CONFIG_PATH,
+    api_key_source,
+    get_anthropic_api_key,
+    load_config_json,
+    load_dotenv_once,
+)
 from osint_tool.core.engine import search
 from osint_tool.core.models import AccountResult, GravatarProfile, SearchResult
 from osint_tool.core.discovery import DiscoveryEngine
+
+load_dotenv_once()
 from osint_tool.modules.reddit import fetch_reddit_content
 from osint_tool.modules.github import fetch_github_content
 from osint_tool.modules.wayback import lookup_wayback
@@ -19,19 +28,9 @@ CONTENT_FETCHERS = {
 }
 
 STATIC_DIR = Path(__file__).parent / "static"
-CONFIG_PATH = Path(__file__).parent.parent.parent / "config.json"
 
 app = FastAPI(title="OSINT Tool")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-def _load_config() -> dict:
-    if CONFIG_PATH.exists():
-        try:
-            return json.loads(CONFIG_PATH.read_text())
-        except Exception:
-            return {}
-    return {}
 
 
 def _save_config(data: dict) -> None:
@@ -116,13 +115,19 @@ async def api_wayback(url: str = Query(..., min_length=1)):
 
 @app.get("/api/settings")
 async def get_settings():
-    config = _load_config()
-    key = config.get("anthropic_api_key", "")
+    load_dotenv_once()
+    effective = get_anthropic_api_key()
+    key_src = api_key_source()
+    config = load_config_json()
+    preview = ""
+    if effective:
+        preview = f"...{effective[-4:]}" if len(effective) > 4 else ""
     return {
-        "has_api_key": bool(key),
-        "api_key_preview": f"...{key[-4:]}" if len(key) > 4 else "",
+        "has_api_key": bool(effective),
+        "api_key_preview": preview,
+        "key_source": key_src,
         "auto_search_variants": config.get("auto_search_variants", False),
-        "extraction_mode": "full" if key else "basic",
+        "extraction_mode": "full" if effective else "basic",
     }
 
 
@@ -133,7 +138,7 @@ class SettingsUpdate(BaseModel):
 
 @app.post("/api/settings")
 async def update_settings(body: SettingsUpdate):
-    config = _load_config()
+    config = load_config_json()
     if body.anthropic_api_key is not None:
         config["anthropic_api_key"] = body.anthropic_api_key
     if body.auto_search_variants is not None:

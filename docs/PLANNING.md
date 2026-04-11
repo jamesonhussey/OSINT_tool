@@ -6,9 +6,9 @@ Miscellaneous follow-ups that are not part of day-to-day feature work. **Do not 
 
 Tackle before treating this tool as shared, network-exposed, or production-ready.
 
-- **Secrets & configuration**
-  - Stop storing API keys (e.g. Anthropic) in plaintext files that might be committed; prefer environment variables or a secrets manager, with a documented `.env.example` (no real values).
-  - Ensure `config.json` (or equivalent) is listed in `.gitignore` if it can hold secrets; rotate any key that has ever lived in a repo or shared copy.
+- **Secrets & configuration** (partially addressed)
+  - **Done:** `ANTHROPIC_API_KEY` env var (and optional `.env` via `python-dotenv`) takes precedence over `config.json` for runtime API calls; see `.env.example` and `osint_tool/core/config_loader.py`. Settings UI still reads/writes `config.json`; GET `/api/settings` reports `key_source` (`environment` | `file` | `none`) so the UI can show when env overrides the file.
+  - Prefer env or a secrets manager for deployment; keep `config.json` gitignored; rotate any key that has ever leaked.
   - Review what the web UI exposes under `/api/settings` (key previews, etc.) and tighten if the server is not strictly local.
 
 - **Web surface**
