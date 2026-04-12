@@ -50,4 +50,6 @@ Once the core extraction loop (check > extract > cache > reuse > stale > re-lear
 
 ---
 
-Other roadmap items (features, UX) remain in `.claude/CLAUDE.md` unless moved here deliberately.
+## Broader roadmap (ideas)
+
+Not scheduled — capture tickets as needed: breach checks (e.g. HIBP), DNS/WHOIS, IP and phone pivots, deeper relationship mapping between identities.
