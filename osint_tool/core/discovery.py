@@ -3,10 +3,13 @@ Multi-hop discovery engine.
 
 Performs a breadth-first search starting from an initial email or username.
 Each found account is passed to a platform resolver which may yield new
-identities (emails or usernames). New identities are queued as additional seeds.
+identities (emails or usernames). With auto_expand=True, new identities are
+queued as additional seeds (classic multi-hop). With auto_expand=False, the
+same identities are streamed for display but not queued; the client can start
+follow-up searches manually.
 
 Usage:
-    engine = DiscoveryEngine("john@example.com", hop_cap=100)
+    engine = DiscoveryEngine("john@example.com", hop_cap=100, auto_expand=False)
     async for event_type, event_data in engine.run():
         ...  # stream to client
 
@@ -18,12 +21,18 @@ Event types (in order of emission):
     identity_discovered — a new identity was extracted from a found account
     hop_complete        — seed finished processing
     cap_reached         — hop cap hit, stopping early
+    cancelled           — cooperative stop (client requested cancel)
     done                — all seeds exhausted (or cap hit)
 """
+import asyncio
 from collections import deque
 from dataclasses import dataclass
 
 from osint_tool.core.engine import is_email, search_email, search_username
+from osint_tool.core.identity_sanitize import (
+    is_username_just_platform_brand,
+    sanitize_discovery_identity,
+)
 from osint_tool.core.models import AccountStatus
 from osint_tool.modules.resolvers import resolve_gravatar, resolve_platform
 
@@ -49,8 +58,17 @@ def _serialize_gravatar(g) -> dict:
 
 
 class DiscoveryEngine:
-    def __init__(self, initial_query: str, hop_cap: int | None = 100):
+    def __init__(
+        self,
+        initial_query: str,
+        hop_cap: int | None = 100,
+        *,
+        auto_expand: bool = False,
+        cancel_event: asyncio.Event | None = None,
+    ):
         self.hop_cap = hop_cap
+        self._auto_expand = auto_expand
+        self._cancel_event = cancel_event
         self.seen_usernames: set[str] = set()
         self.seen_emails: set[str] = set()
         self._queue: deque[_Item] = deque()
@@ -89,6 +107,21 @@ class DiscoveryEngine:
         ))
         return True
 
+    def _register_identity_seen(self, value: str) -> bool:
+        """Record an identity for deduplication without queueing (manual-expand mode)."""
+        if not value:
+            return False
+        key = value.lower()
+        if is_email(value):
+            if key in self.seen_emails:
+                return False
+            self.seen_emails.add(key)
+            return True
+        if key in self.seen_usernames:
+            return False
+        self.seen_usernames.add(key)
+        return True
+
     def _mark_username_seen(self, username: str) -> None:
         self.seen_usernames.add(username.lower())
 
@@ -99,6 +132,10 @@ class DiscoveryEngine:
         yield 'start', {}
 
         while self._queue:
+            if self._cancel_event is not None and self._cancel_event.is_set():
+                yield 'cancelled', {}
+                break
+
             if self.hop_cap is not None and hops_done >= self.hop_cap:
                 yield 'cap_reached', {'cap': self.hop_cap}
                 break
@@ -134,22 +171,34 @@ class DiscoveryEngine:
                     'data': _serialize_gravatar(result.gravatar),
                 }
                 for identity in resolve_gravatar(result.gravatar):
-                    queued = self._enqueue(
-                        identity['value'],
-                        hop=item.hop + 1,
-                        parent_seed=item.seed,
-                        parent_platform='Gravatar',
-                    )
-                    if queued:
-                        yield 'identity_discovered', {
-                            'hop': item.hop,
-                            'source_seed': item.seed,
-                            'source_platform': 'Gravatar',
-                            'value': identity['value'],
-                            'value_type': 'email' if is_email(identity['value']) else 'username',
-                            'source_detail': identity.get('source', ''),
-                            'hint_platform': identity.get('hint_platform'),
-                        }
+                    clean = sanitize_discovery_identity(identity['value'])
+                    if not clean:
+                        continue
+                    if is_username_just_platform_brand(
+                        clean,
+                        source_platform='Gravatar',
+                        hint_platform=identity.get('hint_platform'),
+                    ):
+                        continue
+                    payload = {
+                        'hop': item.hop,
+                        'source_seed': item.seed,
+                        'source_platform': 'Gravatar',
+                        'value': clean,
+                        'value_type': 'email' if is_email(clean) else 'username',
+                        'source_detail': identity.get('source', ''),
+                        'hint_platform': identity.get('hint_platform'),
+                    }
+                    if self._auto_expand:
+                        if self._enqueue(
+                            clean,
+                            hop=item.hop + 1,
+                            parent_seed=item.seed,
+                            parent_platform='Gravatar',
+                        ):
+                            yield 'identity_discovered', payload
+                    elif self._register_identity_seen(clean):
+                        yield 'identity_discovered', payload
 
             # ── Account results + resolvers ───────────────────────────────
 
@@ -177,22 +226,34 @@ class DiscoveryEngine:
                             **extraction_activity,
                         }
                     for identity in identities:
-                        queued = self._enqueue(
-                            identity['value'],
-                            hop=item.hop + 1,
-                            parent_seed=account.username,
-                            parent_platform=account.platform.value,
-                        )
-                        if queued:
-                            yield 'identity_discovered', {
-                                'hop': item.hop,
-                                'source_seed': account.username,
-                                'source_platform': account.platform.value,
-                                'value': identity['value'],
-                                'value_type': 'email' if is_email(identity['value']) else 'username',
-                                'source_detail': identity.get('source', ''),
-                                'hint_platform': identity.get('hint_platform'),
-                            }
+                        clean = sanitize_discovery_identity(identity['value'])
+                        if not clean:
+                            continue
+                        if is_username_just_platform_brand(
+                            clean,
+                            source_platform=account.platform.value,
+                            hint_platform=identity.get('hint_platform'),
+                        ):
+                            continue
+                        payload = {
+                            'hop': item.hop,
+                            'source_seed': account.username,
+                            'source_platform': account.platform.value,
+                            'value': clean,
+                            'value_type': 'email' if is_email(clean) else 'username',
+                            'source_detail': identity.get('source', ''),
+                            'hint_platform': identity.get('hint_platform'),
+                        }
+                        if self._auto_expand:
+                            if self._enqueue(
+                                clean,
+                                hop=item.hop + 1,
+                                parent_seed=account.username,
+                                parent_platform=account.platform.value,
+                            ):
+                                yield 'identity_discovered', payload
+                        elif self._register_identity_seen(clean):
+                            yield 'identity_discovered', payload
 
             yield 'hop_complete', {
                 'hop': item.hop,

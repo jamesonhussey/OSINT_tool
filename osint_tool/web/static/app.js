@@ -8,6 +8,26 @@ let drawerCounter = 0;   // global, always incrementing — guarantees unique dr
 let blockCounter  = 0;   // global, always incrementing — guarantees unique block IDs
 const paginationState = new Map();
 
+/** Active SSE discovery streams (cooperative cancel + global Stop). */
+const activeDiscoveryStreams = new Map();
+
+function registerActiveStream(searchId, es, blockEl) {
+  blockEl.dataset.searchId = searchId;
+  activeDiscoveryStreams.set(searchId, { es, blockEl });
+  const bar = document.getElementById('global-stop-bar');
+  if (bar) bar.classList.remove('hidden');
+}
+
+function unregisterActiveStream(searchId) {
+  if (!searchId) return;
+  activeDiscoveryStreams.delete(searchId);
+  const bar = document.getElementById('global-stop-bar');
+  if (bar && activeDiscoveryStreams.size === 0) bar.classList.add('hidden');
+}
+
+const DANGER_LS_KEY = 'osint_danger_auto_expand';
+const DANGER_CONFIRM_LS_KEY = 'osint_danger_mode_confirm_v1';
+
 // ── DOM refs ───────────────────────────────────────────────────────────────────
 
 const form             = document.getElementById('search-form');
@@ -18,6 +38,7 @@ const capBtn           = document.getElementById('cap-btn');
 const hybridsBtn       = document.getElementById('hybrids-btn');
 const collapseAllBtn   = document.getElementById('collapse-all-btn');
 const hybridTray       = document.getElementById('hybrid-tray');
+const demoBtn          = document.getElementById('demo-btn');
 const settingsBtn      = document.getElementById('settings-btn');
 const settingsModal    = document.getElementById('settings-modal');
 const settingsClose    = document.getElementById('settings-close');
@@ -28,6 +49,41 @@ const autoVariantsToggle = document.getElementById('auto-variants-toggle');
 const extractionNotice = document.getElementById('extraction-notice');
 const resetExtractionBtn   = document.getElementById('reset-extraction-cache-btn');
 const resetExtractionStatus = document.getElementById('reset-extraction-status');
+const dangerBtn            = document.getElementById('danger-btn');
+const globalStopBtn        = document.getElementById('global-stop-btn');
+
+let dangerMode = localStorage.getItem(DANGER_LS_KEY) === '1';
+if (dangerBtn) {
+  dangerBtn.classList.toggle('active', dangerMode);
+  dangerBtn.addEventListener('click', () => {
+    const next = !dangerMode;
+    if (next && !localStorage.getItem(DANGER_CONFIRM_LS_KEY)) {
+      const ok = confirm(
+        'Auto-expand runs follow-up searches for every discovered identity. This can use many requests and spiral quickly. Enable anyway?',
+      );
+      if (!ok) return;
+      localStorage.setItem(DANGER_CONFIRM_LS_KEY, '1');
+    }
+    dangerMode = next;
+    localStorage.setItem(DANGER_LS_KEY, dangerMode ? '1' : '0');
+    dangerBtn.classList.toggle('active', dangerMode);
+  });
+}
+
+globalStopBtn?.addEventListener('click', () => {
+  for (const [sid, { es }] of [...activeDiscoveryStreams]) {
+    fetch('/api/search/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ search_id: sid }),
+    }).catch(() => {});
+    try {
+      es.close();
+    } catch (_) {}
+  }
+  activeDiscoveryStreams.clear();
+  document.getElementById('global-stop-bar')?.classList.add('hidden');
+});
 
 // ── Cap toggle ─────────────────────────────────────────────────────────────────
 
@@ -171,14 +227,13 @@ loadSettings();
 
 // ── Form submit ────────────────────────────────────────────────────────────────
 
-form.addEventListener('submit', async e => {
-  e.preventDefault();
-  const q = input.value.trim();
+async function submitMainSearch(query) {
+  const q = query.trim();
   if (!q) return;
+  input.value = q;
   resultsEl.classList.remove('hidden');
   const blockEl = startSearch(q, null);
 
-  // Auto-variants if enabled
   try {
     const res = await fetch('/api/settings');
     const cfg = await res.json();
@@ -188,6 +243,15 @@ form.addEventListener('submit', async e => {
       showVariantTray(vtray, q, null, blockEl);
     }
   } catch {}
+}
+
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  submitMainSearch(input.value);
+});
+
+demoBtn?.addEventListener('click', () => {
+  submitMainSearch('octocat');
 });
 
 // ── Search block ───────────────────────────────────────────────────────────────
@@ -223,7 +287,10 @@ function buildSearchBlock(query, parentBlockEl) {
 
   // Delete
   el.querySelector('.block-delete-btn').addEventListener('click', () => {
-    if (el._eventSource) el._eventSource.close();
+    if (el._eventSource) {
+      unregisterActiveStream(el.dataset.searchId);
+      el._eventSource.close();
+    }
     el.remove();
   });
 
@@ -274,9 +341,17 @@ function runSSESearch(query, blockEl) {
     else blockStatus.classList.add('hidden');
   };
 
-  const url = `/api/search/stream?q=${encodeURIComponent(query)}&cap=${capEnabled}`;
-  const es  = new EventSource(url);
+  const searchId =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const url =
+    `/api/search/stream?q=${encodeURIComponent(query)}&cap=${capEnabled}` +
+    `&danger=${dangerMode ? 'true' : 'false'}&sid=${encodeURIComponent(searchId)}`;
+  const es = new EventSource(url);
   blockEl._eventSource = es;
+  registerActiveStream(searchId, es, blockEl);
 
   const on = (type, fn) => es.addEventListener(type, e => fn(JSON.parse(e.data)));
 
@@ -288,6 +363,10 @@ function runSSESearch(query, blockEl) {
           <span class="tree-collapse-icon">&#9660;</span>
           Unique Identities
           <span class="uid-count unique-id-count">0</span>
+          <span class="uid-header-actions">
+            <button type="button" class="uid-search-selected-btn cap-btn"
+              title="Run a new child search for each checked identity">Search selected</button>
+          </span>
         </div>
         <div class="uid-list unique-id-list">
           <span class="unique-id-empty">None discovered yet…</span>
@@ -303,6 +382,17 @@ function runSSESearch(query, blockEl) {
         </div>
       </div>
       <div class="discovery-tree"></div>`;
+
+    const uidHeader = resultsDiv.querySelector('.unique-id-header');
+    uidHeader?.querySelector('.uid-header-actions')?.addEventListener('click', e => e.stopPropagation());
+    resultsDiv.querySelector('.uid-search-selected-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      blockEl.querySelectorAll('.uid-list .identity-expand-cb:checked').forEach(cb => {
+        const row = cb.closest('.unique-id-item');
+        const val = row?.querySelector('.unique-id-value')?.textContent?.trim();
+        if (val) startSearch(val, blockEl);
+      });
+    });
   });
 
   on('hop_start', data => {
@@ -431,6 +521,9 @@ function runSSESearch(query, blockEl) {
 
       list.insertAdjacentHTML('beforeend', `
         <div class="unique-id-item" id="uid-item-${itemId}">
+          <label class="identity-cb-wrap" title="Select for child search">
+            <input type="checkbox" class="identity-expand-cb" aria-label="Select identity for child search" />
+          </label>
           <span class="identity-type-badge">${esc(data.value_type)}</span>
           <span class="unique-id-value">${esc(data.value)}</span>
           <span class="unique-id-source">via ${esc(data.source_platform)}${hint}</span>
@@ -495,6 +588,14 @@ function runSSESearch(query, blockEl) {
     setBlockStatus(`Cap reached at ${data.cap} hops.`);
   });
 
+  on('cancelled', () => {
+    setBlockStatus('Cancelled.');
+    resultsDiv.querySelector('.discovery-tree')?.insertAdjacentHTML(
+      'beforeend',
+      '<div class="cancel-notice">Search stopped at the next hop boundary.</div>',
+    );
+  });
+
   on('done', data => {
     const tree = resultsDiv.querySelector('.discovery-tree');
     if (tree) {
@@ -506,12 +607,14 @@ function runSSESearch(query, blockEl) {
         </div>`);
     }
     setBlockStatus('');
+    unregisterActiveStream(blockEl.dataset.searchId);
     es.close();
   });
 
   es.onerror = () => {
     if (es.readyState !== EventSource.CLOSED) {
       setBlockStatus('Connection error — search may be incomplete.');
+      unregisterActiveStream(blockEl.dataset.searchId);
       es.close();
     }
   };

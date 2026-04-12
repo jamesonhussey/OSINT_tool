@@ -1,4 +1,6 @@
 import asyncio
+from urllib.parse import quote
+
 import aiohttp
 from osint_tool.core.models import AccountResult, AccountStatus, Platform
 
@@ -148,6 +150,145 @@ async def _check_linkedin(session: aiohttp.ClientSession, username: str) -> Chec
     )
 
 
+async def _check_gitlab(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    url = f"https://gitlab.com/api/v4/users?username={quote(username)}"
+    async with session.get(
+        url,
+        headers={**HEADERS, "Accept": "application/json"},
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as resp:
+        if resp.status != 200:
+            st = AccountStatus.NOT_FOUND if resp.status == 404 else AccountStatus.ERROR
+            return st, None
+        try:
+            data = await resp.json()
+        except Exception:
+            return AccountStatus.ERROR, None
+        if isinstance(data, list) and len(data) > 0:
+            return AccountStatus.FOUND, None
+        return AccountStatus.NOT_FOUND, None
+
+
+async def _check_codeberg(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    url = f"https://codeberg.org/api/v1/users/{username}"
+    async with session.get(
+        url,
+        headers={**HEADERS, "Accept": "application/json"},
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as resp:
+        if resp.status == 200:
+            return AccountStatus.FOUND, None
+        if resp.status == 404:
+            return AccountStatus.NOT_FOUND, None
+        return AccountStatus.ERROR, None
+
+
+async def _check_docker_hub(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    url = f"https://hub.docker.com/v2/users/{username}/"
+    async with session.get(
+        url,
+        headers={**HEADERS, "Accept": "application/json"},
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as resp:
+        if resp.status == 200:
+            return AccountStatus.FOUND, None
+        if resp.status == 404:
+            return AccountStatus.NOT_FOUND, None
+        return AccountStatus.ERROR, None
+
+
+async def _check_devto(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_status(session, f"https://dev.to/{username}")
+
+
+async def _check_vimeo(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_status(session, f"https://vimeo.com/{username}")
+
+
+async def _check_soundcloud(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://soundcloud.com/{username}",
+        ["sorry, we couldn't find that sound", "not found", "page not found"],
+    )
+
+
+async def _check_patreon(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.patreon.com/{username}",
+        ["no matching creator", "page not found", "doesn't exist"],
+    )
+
+
+async def _check_product_hunt(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.producthunt.com/@{username}",
+        ["page not found", "doesn't exist", "no users"],
+    )
+
+
+async def _check_behance(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.behance.net/{username}",
+        ["project not found", "page not found", "can't be found"],
+    )
+
+
+async def _check_dribbble(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://dribbble.com/{username}",
+        ["page not found", "no results", "nothing here"],
+    )
+
+
+async def _check_flickr(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.flickr.com/people/{username}/",
+        ["page not found", "not found", "does not exist"],
+    )
+
+
+async def _check_keybase(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_status(session, f"https://keybase.io/{username}")
+
+
+async def _check_huggingface(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_status(session, f"https://huggingface.co/{username}")
+
+
+async def _check_npm(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_status(session, f"https://www.npmjs.com/~{username}")
+
+
+async def _check_kickstarter(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.kickstarter.com/profile/{username}",
+        ["page not found", "we can't find", "doesn't exist"],
+    )
+
+
+async def _check_leetcode(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://leetcode.com/{username}/",
+        ["page not found", "user not found", "does not exist"],
+    )
+
+
+async def _check_chess_com(session: aiohttp.ClientSession, username: str) -> CheckResult:
+    return await _check_by_body(
+        session,
+        f"https://www.chess.com/member/{username}",
+        ["page not found", "member not found", "could not be found"],
+    )
+
+
 PLATFORM_CHECKS = [
     (Platform.GITHUB, _check_github, "https://github.com/{username}"),
     (Platform.TWITTER, _check_twitter, "https://x.com/{username}"),
@@ -159,6 +300,23 @@ PLATFORM_CHECKS = [
     (Platform.YOUTUBE, _check_youtube, "https://www.youtube.com/@{username}"),
     (Platform.STEAM, _check_steam, "https://steamcommunity.com/id/{username}"),
     (Platform.MEDIUM, _check_medium, "https://medium.com/@{username}"),
+    (Platform.GITLAB, _check_gitlab, "https://gitlab.com/{username}"),
+    (Platform.DEVTO, _check_devto, "https://dev.to/{username}"),
+    (Platform.VIMEO, _check_vimeo, "https://vimeo.com/{username}"),
+    (Platform.SOUNDCLOUD, _check_soundcloud, "https://soundcloud.com/{username}"),
+    (Platform.PATREON, _check_patreon, "https://www.patreon.com/{username}"),
+    (Platform.PRODUCT_HUNT, _check_product_hunt, "https://www.producthunt.com/@{username}"),
+    (Platform.BEHANCE, _check_behance, "https://www.behance.net/{username}"),
+    (Platform.DRIBBBLE, _check_dribbble, "https://dribbble.com/{username}"),
+    (Platform.FLICKR, _check_flickr, "https://www.flickr.com/people/{username}/"),
+    (Platform.KEYBASE, _check_keybase, "https://keybase.io/{username}"),
+    (Platform.HUGGINGFACE, _check_huggingface, "https://huggingface.co/{username}"),
+    (Platform.DOCKER_HUB, _check_docker_hub, "https://hub.docker.com/u/{username}"),
+    (Platform.NPM, _check_npm, "https://www.npmjs.com/~{username}"),
+    (Platform.KICKSTARTER, _check_kickstarter, "https://www.kickstarter.com/profile/{username}"),
+    (Platform.CODEBERG, _check_codeberg, "https://codeberg.org/{username}"),
+    (Platform.LEETCODE, _check_leetcode, "https://leetcode.com/{username}/"),
+    (Platform.CHESS_COM, _check_chess_com, "https://www.chess.com/member/{username}"),
 ]
 
 

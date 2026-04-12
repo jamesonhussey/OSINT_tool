@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -31,6 +32,9 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="OSINT Tool")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Cooperative cancel: one Event per active SSE stream (keyed by client search_id).
+_active_cancel_events: dict[str, asyncio.Event] = {}
 
 
 def _save_config(data: dict) -> None:
@@ -199,17 +203,52 @@ async def generate_hybrids_endpoint(body: HybridsRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CancelSearchRequest(BaseModel):
+    search_id: str
+
+
+@app.post("/api/search/cancel")
+async def cancel_search(body: CancelSearchRequest):
+    """Signal the discovery engine to stop after the current hop (cooperative)."""
+    ev = _active_cancel_events.get(body.search_id)
+    if ev is not None:
+        ev.set()
+    return {"ok": True}
+
+
 @app.get("/api/search/stream")
 async def search_stream(
     q: str = Query(..., min_length=1),
     cap: bool = Query(True),
+    danger: bool = Query(
+        False,
+        description="If true, auto-queue discovered identities (multi-hop). Default is manual expand.",
+    ),
+    sid: str | None = Query(
+        None,
+        description="Client-generated id for POST /api/search/cancel cooperative stop.",
+    ),
 ):
     """SSE endpoint for multi-hop streaming discovery."""
-    engine = DiscoveryEngine(q, hop_cap=100 if cap else None)
+    cancel_event: asyncio.Event | None = None
+    if sid:
+        cancel_event = asyncio.Event()
+        _active_cancel_events[sid] = cancel_event
+
+    engine = DiscoveryEngine(
+        q.strip(),
+        hop_cap=100 if cap else None,
+        auto_expand=danger,
+        cancel_event=cancel_event,
+    )
 
     async def event_gen():
-        async for event_type, event_data in engine.run():
-            yield f"event: {event_type}\ndata: {json.dumps(event_data)}\n\n"
+        try:
+            async for event_type, event_data in engine.run():
+                yield f"event: {event_type}\ndata: {json.dumps(event_data)}\n\n"
+        finally:
+            if sid:
+                _active_cancel_events.pop(sid, None)
 
     return StreamingResponse(
         event_gen(),

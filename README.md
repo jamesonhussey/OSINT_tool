@@ -55,7 +55,7 @@ python -m osint_tool search "username_or_email@example.com"
 
 ## What’s in the box
 
-- Username checks across a set of public platforms (see `osint_tool/modules/username_enum.py`).
+- Username checks across **27** public platforms (see `osint_tool/modules/username_enum.py`). Many sites rate-limit or block automated requests; rows may show **error** even when a profile exists—treat results as heuristic.
 - **Gravatar** and hand-tuned resolvers where applicable.
 - **Web:** streaming discovery, optional Reddit/GitHub activity panels, Wayback hints, extraction activity log, local rule cache for HTML/LLM extraction.
 - **Docs:** `docs/PLANNING.md` (backlog and security notes).

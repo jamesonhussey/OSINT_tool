@@ -16,7 +16,10 @@
 | |_| |___) | || |\  | | |     | || |_| | |_| | |___
  \___/|____/___|_| \_| |_|     |_| \___/ \___/|_____|
       </pre>
-      <button id="settings-btn" class="settings-btn" title="Settings">&#9881;</button>
+      <div class="header-actions">
+        <button type="button" id="demo-btn" class="demo-btn" title="Run a demo search for GitHub user octocat">Demo</button>
+        <button type="button" id="settings-btn" class="settings-btn" title="Settings">&#9881;</button>
+      </div>
     </header>
 
     <form id="search-form">
@@ -39,17 +42,29 @@
           title="Stops multi-hop discovery at 100 seeds to prevent runaway searches">
           &#9889; 100 Hop Cap
         </button>
+        <button type="button" id="danger-btn" class="cap-btn"
+          title="When on, automatically queues follow-up searches for every discovered identity (legacy behavior). When off, you choose which identities to search next.">
+          &#9888; Auto-expand
+        </button>
         <button type="button" id="hybrids-btn" class="cap-btn"
           title="Analyse patterns across all visible searches and generate cross-seed username combinations">
           &#9881; Generate Hybrids
         </button>
       </div>
+      <p class="search-mode-hint">
+        Default: identities are listed but not auto-searched. Use checkboxes + <strong>Search selected</strong>, or turn on <strong>Auto-expand</strong> for automatic multi-hop (uses more requests).
+      </p>
     </form>
 
     <div id="hybrid-tray" class="variant-tray hidden"></div>
     <div id="extraction-notice" class="extraction-notice hidden"></div>
     <div id="status" class="status hidden"></div>
     <div id="results"></div>
+  </div>
+
+  <div id="global-stop-bar" class="global-stop-bar hidden" role="region" aria-label="Active discovery">
+    <span class="global-stop-hint">Discovery in progress</span>
+    <button type="button" id="global-stop-btn" class="stop-btn">Stop</button>
   </div>
 
   <!-- Settings modal -->

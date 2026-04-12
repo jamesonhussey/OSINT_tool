@@ -21,7 +21,7 @@ body {
   color: var(--text);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   min-height: 100vh;
-  padding: 2rem 1rem;
+  padding: 2rem 1rem 5rem;
 }
 
 .container {
@@ -108,6 +108,50 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 .cap-btn:hover { opacity: 0.85; }
+
+#danger-btn.active {
+  background: rgba(210, 153, 34, 0.12);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.search-mode-hint {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  margin-top: 0.75rem;
+  max-width: 52rem;
+}
+
+.global-stop-bar {
+  align-items: center;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  bottom: 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  left: 0;
+  padding: 0.65rem 1rem;
+  position: fixed;
+  right: 0;
+  z-index: 1000;
+}
+
+.global-stop-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.stop-btn {
+  background: var(--red);
+  color: #fff;
+  font-size: 0.9rem;
+  padding: 0.45rem 1.2rem;
+}
+
+.stop-btn:hover { opacity: 0.92; }
 
 .cap-hint {
   color: var(--text-muted);
@@ -530,14 +574,41 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   text-align: center;
 }
 
+.cancel-notice {
+  color: var(--yellow);
+  font-size: 0.82rem;
+  padding: 0.5rem 0;
+}
+
 /* ── Unique Identities panel ────────────────────────────────────────────── */
 
 .unique-id-header {
   align-items: center;
   cursor: pointer;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   user-select: none;
+}
+
+.uid-header-actions {
+  margin-left: auto;
+}
+
+.uid-header-actions .uid-search-selected-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.identity-cb-wrap {
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.identity-cb-wrap input {
+  cursor: pointer;
 }
 
 .unique-id-header:hover { opacity: 0.85; }
@@ -826,6 +897,33 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .site-header .banner {
   margin-bottom: 0;
+}
+
+.header-actions {
+  align-items: flex-start;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.demo-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 0.1rem;
+  padding: 0.4rem 0.65rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.demo-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
 }
 
 /* ── Settings button ────────────────────────────────────────────────────── */

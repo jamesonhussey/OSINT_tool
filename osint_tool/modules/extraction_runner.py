@@ -178,6 +178,12 @@ def _extract_regex(method: ExtractionMethod, html: str) -> list[dict]:
 _URL_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"(?:twitter|x)\.com/(?:@)?([\w]{1,50})(?:[/?#]|$)"), "Twitter/X"),
     (re.compile(r"github\.com/([\w][\w-]{0,38})(?:[/?#]|$)"), "GitHub"),
+    (re.compile(r"gitlab\.com/([\w][\w-]{0,255})(?:[/?#]|$)"), "GitLab"),
+    (re.compile(r"codeberg\.org/([\w][\w-]{0,255})(?:[/?#]|$)"), "Codeberg"),
+    (re.compile(r"dev\.to/([\w][\w-]{0,255})(?:[/?#]|$)"), "Dev.to"),
+    (re.compile(r"soundcloud\.com/([\w][\w-]{0,255})(?:[/?#]|$)"), "SoundCloud"),
+    (re.compile(r"keybase\.io/([\w][\w-]{0,255})(?:[/?#]|$)"), "Keybase"),
+    (re.compile(r"huggingface\.co/([\w][\w.-]{0,255})(?:[/?#]|$)"), "Hugging Face"),
     (re.compile(r"instagram\.com/([\w.]{1,30})(?:[/?#]|$)"), "Instagram"),
     (re.compile(r"reddit\.com/u(?:ser)?/([\w-]{3,20})(?:[/?#]|$)"), "Reddit"),
     (re.compile(r"pinterest\.com/([\w_]{3,30})(?:[/?#]|$)"), "Pinterest"),

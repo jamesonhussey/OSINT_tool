@@ -22,6 +22,13 @@ GITHUB_HEADERS = {
 
 EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b')
 
+# Public profile HTML that mixes the target with suggestions, ads, and “also viewed” lists.
+# LLM/CSS extraction here mostly yields unrelated people’s names.
+_SKIP_UNRELIABLE_HTML_EXTRACTION = frozenset({
+    "linkedin.com",
+    "linkedin.cn",
+})
+
 # Patterns to extract (username, platform) from a social profile URL.
 # Each pattern stops at a slash, query string, or end-of-string so we don't
 # accidentally grab path segments as usernames.
@@ -36,6 +43,11 @@ _SOCIAL_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'youtube\.com/@([\w-]{3,30})(?:[/?#]|$)'), 'YouTube'),
     (re.compile(r'medium\.com/@([\w-]{3,50})(?:[/?#]|$)'), 'Medium'),
     (re.compile(r'steamcommunity\.com/id/([\w-]{2,32})(?:[/?#]|$)'), 'Steam'),
+    (re.compile(r'gitlab\.com/([\w][\w-]{0,255})(?:[/?#]|$)'), 'GitLab'),
+    (re.compile(r'codeberg\.org/([\w][\w-]{0,255})(?:[/?#]|$)'), 'Codeberg'),
+    (re.compile(r'dev\.to/([\w][\w-]{0,255})(?:[/?#]|$)'), 'Dev.to'),
+    (re.compile(r'soundcloud\.com/([\w][\w-]{0,255})(?:[/?#]|$)'), 'SoundCloud'),
+    (re.compile(r'keybase\.io/([\w][\w-]{0,255})(?:[/?#]|$)'), 'Keybase'),
 ]
 
 # Generic URL path segments that are navigation, not usernames.
@@ -290,6 +302,16 @@ async def resolve_via_rules(
     domain = urlparse(profile_url).netloc.lstrip("www.")
     if not domain:
         return [], None
+
+    if domain in _SKIP_UNRELIABLE_HTML_EXTRACTION:
+        return [], {
+            "domain": domain,
+            "mode": "skipped",
+            "message": (
+                f"Skipped HTML extraction for {domain} - pages embed many unrelated names "
+                "(suggestions, feeds, widgets); automatic extraction is disabled."
+            ),
+        }
 
     cache = get_rule_cache()
     rule = cache.get(domain)
