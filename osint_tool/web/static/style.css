@@ -1237,6 +1237,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   padding: 0.35rem 0;
 }
 
+.extraction-activity-log.collapsed { display: none; }
+
 .extraction-activity-empty {
   color: var(--text-muted);
   font-size: 0.78rem;

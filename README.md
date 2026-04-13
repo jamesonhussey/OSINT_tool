@@ -4,6 +4,36 @@ A Python tool for **open-source intelligence** workflows: given an email or user
 
 Use it only on targets you are **authorized** to investigate and in line with applicable laws and site terms.
 
+## Screenshots
+
+**Start page** — enter a username or email to begin.
+
+![Start page](start_page.png)
+
+**Search results** — platform checks with live status, discovered identities extracted from profile HTML via regex and LLM rules.
+
+![Initial seed search](search_initial_seed.png)
+
+**Unique Identities** — deduplicated identities discovered across platforms, with options to flag, generate variants, or search selected.
+
+![Unique Identities](unique_identities.png)
+
+**AI username variants** — LLM-generated alternative usernames to broaden the search.
+
+![Username variants](generate_searchable_username_variants.png)
+
+**Hybrid generation** — cross-pollinated username and real-name combinations from all discovered identities.
+
+![Hybrid generation](generate_searchable_username_hybrids.png)
+
+**Multi-hop discovery** — expand found identities into child searches to explore deeper connections.
+
+![Multi-hop discovery](repeat_search_for_found_IDs.png)
+
+**Extraction activity & LLM rule cache** — live log of HTML extraction steps, LLM-generated scraping rules, and cached selectors.
+
+![Extraction activity](LLM_scrape_rule_generator.png)
+
 ## Requirements
 
 - **Python 3.10+** (3.11 recommended)
